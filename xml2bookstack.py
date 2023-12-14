@@ -27,6 +27,7 @@ from xml2mw import read_xml
 from xml2mw.sitemap import build_sitemap, write_sitemap
 from xml2mw.write_markup import write_mediawiki
 from xml2mw.bookstack import to_bookstack
+import argparse
 
 # Modify this to suit your needs.
 XML_PATH = "./data"           # path to folder which contains your 'entities.xml' export file
@@ -41,11 +42,20 @@ PLAIN_TEMPLATE = join(TEMPLATE_PATH, "plain_template.txt")
 HTML_TEMPLATE = join(TEMPLATE_PATH, "html_template.html")
 MEWI_TEMPLATE = join(TEMPLATE_PATH, "mw_template.txt")
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Convert Confluence xml space export to BookStack book, chapters and pages')
+
+    parser.add_argument('-d', '--data', help="data folder to use", default=XML_PATH, dest='data')
+
+    args = parser.parse_args()
+    return args
 
 def main():
-    """Run the actual script"""
+    
+    args = parse_arguments()
+
     # Retrieve all the page data from XML export file.
-    pages, spaces = read_xml.read(join(XML_PATH, 'entities.xml'), BASE64_ENCODE_IMG)
+    pages, spaces = read_xml.read(abspath(args.data), BASE64_ENCODE_IMG)
 
     # Generate a sitemap visualization of the tree structure of the pages.
     sitemap_root = build_sitemap(pages)

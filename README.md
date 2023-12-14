@@ -15,7 +15,7 @@ The forked repo [ben-tinc/xml2mw](https://github.com/ben-tinc/xml2mw) was a grea
  
  * Clone this repo and `cd xml2bookstack`.
  * Use `pipenv install` to install all dependencies (or ensure for yourself that you use `python3` and that `lxml` and `anytree` are installed). If using `pipenv`, type `pipenv shell` afterwards to enter the virtualenv.
- * Place the `entities.xml` file and `attachements` folder from the confluence export inside a `data` subdirectory (or adjust the `XML_PATH` setting in the script).
+ * Place the `entities.xml` file and `attachements` folder from the confluence export inside a `data` subdirectory (or specify location with -d/--data option).
  * Copy `dot.env.sample` to `.env` and configure for your BookStack instance (url, api token and secret)
  * Copy `emoticons` folder to your BookStack instance {web root}/public/emoticons (optional) 
  * Run `python xml2bookstack.py`.
@@ -25,8 +25,9 @@ The forked repo [ben-tinc/xml2mw](https://github.com/ben-tinc/xml2mw) was a grea
 - [X] Flatten deep page hierarchy
 - [X] Emojis
 - [ ] Comments
-- [ ] Fix page ordering
+- [ ] Page order
 - [ ] Table formatting (header, color, width)
+- [ ] Image size
 
 ## Known issues
 * Chapter/Page order is wrong
