@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 lxml = "*"
 anytree = "*"
+python-dotenv = "*"
+bookstack = {git = "https://github.com/olivierIllogika/bookstack.git" }
 
 [dev-packages]
 ipython = "*"

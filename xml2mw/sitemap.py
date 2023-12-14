@@ -14,7 +14,7 @@ def build_sitemap(pages):
         if not page: return
 
         current_title = page['title']
-        current = Node(current_title, parent=parent)
+        current = Node(current_title, parent=parent, page=page)
 
         for child_id in page.get('children', '').split(','):
             child_page = all_pages.get(child_id)

@@ -26,29 +26,33 @@ from os.path import abspath, basename, dirname, join, normpath
 from xml2mw import read_xml
 from xml2mw.sitemap import build_sitemap, write_sitemap
 from xml2mw.write_markup import write_mediawiki
+from xml2mw.bookstack import to_bookstack
 
 # Modify this to suit your needs.
 XML_PATH = "./data"           # path to folder which contains your 'entities.xml' export file
-OUT_PATH = "./output/sc/"     # where to store the results
+OUT_PATH = "./output/"     # where to store the results
+
+BASE64_ENCODE_IMG = True
 
 # Do NOT modify this.
 BASE_PATH = dirname(abspath(__file__))
 TEMPLATE_PATH = join(BASE_PATH, "templates")
 PLAIN_TEMPLATE = join(TEMPLATE_PATH, "plain_template.txt")
+HTML_TEMPLATE = join(TEMPLATE_PATH, "html_template.html")
 MEWI_TEMPLATE = join(TEMPLATE_PATH, "mw_template.txt")
 
 
 def main():
     """Run the actual script"""
     # Retrieve all the page data from XML export file.
-    pages = read_xml.read(join(XML_PATH, 'entities.xml'))
+    pages, spaces = read_xml.read(join(XML_PATH, 'entities.xml'), BASE64_ENCODE_IMG)
 
     # Generate a sitemap visualization of the tree structure of the pages.
     sitemap_root = build_sitemap(pages)
     write_sitemap(sitemap_root, "sitemap.txt")
 
     # Write markup output files.
-    write_mediawiki(pages, OUT_PATH, MEWI_TEMPLATE)
+    to_bookstack(pages, spaces, sitemap_root)
 
 
 if __name__ == "__main__":

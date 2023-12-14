@@ -3,8 +3,11 @@
 # Filename: write_markup.py
 # Copyright (C) 2018  Henning Gebhard
 
+import re
 from os import makedirs
 from os.path import join
+import pathlib
+from string import Template
 
 from xml2mw.transform import to_mw
 
@@ -12,6 +15,7 @@ from xml2mw.transform import to_mw
 def write_mediawiki(pages, path, template):
     """Write a markup file for each page recovered from the XML."""
     makedirs(path, exist_ok=True)
+    ext = pathlib.Path(template).suffix
 
     with open(template) as tmpl_file:
         tmpl = tmpl_file.read()
@@ -19,7 +23,7 @@ def write_mediawiki(pages, path, template):
     for page_id, page_data in pages.items():
         body = page_data.get('body', '')
         body_text = "\n".join(to_mw(body))
-        filename = page_data.get('title', '') + '_' + str(page_id) + '.txt'
+        filename = re.sub(r'[\\/*?:"<>|]',"",page_data.get('title', '')) + '_' + str(page_id) + ext
         filepath = join(path, filename)
         data = {
             'body': body_text,
@@ -30,7 +34,7 @@ def write_mediawiki(pages, path, template):
             'latest_mod': page_data.get('lastModificationDate'),
             'position': page_data.get('position'),
         }
-        filecontent = tmpl.format(**data)
+        filecontent = Template(tmpl).safe_substitute(data)
 
         with open(filepath, 'w') as outfile:
             outfile.write(filecontent)

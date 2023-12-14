@@ -11,13 +11,17 @@ to recreate the page contents.
 from datetime import datetime
 
 from lxml import etree
+import re
+import os
+import json
+import base64
 
 
 class RetrievalError(RuntimeError):
     """Indicates that some necessary data could not be retrieved from the XML."""
 
 
-def read(filepath):
+def read(data_path, base64_encode):
     """Facade and main entry point to the module. Retrieves all pages of an XML export.
 
     - Reads and parses a xml file.
@@ -26,26 +30,102 @@ def read(filepath):
     - Acquires linked content of the pages.
     """
     pages = {}
+    attachements = {}
+    filepath = os.path.join(data_path, 'entities.xml')
+
     try:
         root = parse_xml(filepath)
+        spaces = retrieve_space_object(root)
+        attachements = retrieve_latest_attachements(root)
         pages = retrieve_all_pages(root)
         pages = filter_most_recent(pages)
-        pages = denormalize(root, pages)
+        pages = denormalize(root, data_path, pages, attachements, base64_encode)
     except Exception as e:
         print("Could not execute read_xml.read().")
         raise e
-    return pages
+    return pages, spaces
 
 
-def denormalize(root, pages):
+def denormalize(root, data_path, pages, attachements, base64_encode):
     """Merge content like 'bodyContents' or links, which are stored in separate
     elements in the XML, with their respective page data.
     """
     for page_id, page_data in pages.items():
         # Retrieve bodyContents element.
-        page_data['body'] = _get_body_content(root, page_data['bodyContents'])
+        if 'bodyContents' in page_data:
+          raw_body = _get_body_content(root, page_data['bodyContents'])
+          with_img = replace_img(root, data_path, raw_body, attachements, base64_encode);
+          page_data['body'] = replace_emoticons(with_img)
+        else:
+            page_data['body'] = ''
     return pages
 
+def find_emoticon(name):
+    # https://confluence.atlassian.com/doc/confluence-storage-format-790796544.html
+    known_emoticons = ['smile', 'sad', 'cheeky', 'laugh', 'wink', 'thumbs-up', 'thumbs-down', 'information', 'tick', 'cross', 'warning']
+
+    if name in known_emoticons:
+        return f'<img alt="({name})" data-emoticon-name="{name}" class="emoticon emoticon-{name}" src="/emoticons/{name}.svg">'
+    
+    return f"- emoticon '{name}' not found -"
+
+def replace_individual_emoticon(match):
+    attributes = {}
+    for i in re.findall('(?:ac:(.+?=".+?"))', match.group(1)):
+        pair = i.replace('"', '').split('=')
+        attributes[pair[0]] = pair[1]
+
+    return find_emoticon(attributes['name'])
+
+def replace_emoticons(body): # <:emoticon ac:name="warning" />
+    replaced_body = re.sub('(?:<ac:emoticon (.+?) />)', replace_individual_emoticon, body)
+    return replaced_body    
+
+def base64_image(path, ext=None):
+
+    content = open(path, 'rb').read()
+    base64_utf8 = base64.b64encode(content).decode('utf-8')
+
+    if ext is None:
+        ext = path.split('.')[-1]
+
+    return f'data:image/{ext};base64,{base64_utf8}'
+
+def attachement_replace(data_path, match, attachements, base64_encode):
+
+    img_attributes = re.findall('(?:ac:(.+?=".+?"))', match.group(1)[9:])
+    attachement_attributes = {}
+    version = 1    
+    for i in re.findall('(?:ri:(.+?=".+?"))', match.group(3)):
+        pair = i.replace('"', '').split('=')
+        attachement_attributes[pair[0]] = pair[1]
+        
+    attachement = attachements[attachement_attributes['filename']]
+
+    if 'version-at-save' in attachement_attributes:
+        version = attachement_attributes['version-at-save']
+    else:
+        #version = attachement['hibernateVersion']
+        version = attachement['version']
+
+    path = f"{data_path}/attachments/{attachement['containerContent']}/{attachement['id']}/{version}"
+    ext = attachement_attributes['filename'].split('.')[-1].lower()
+
+    if not os.path.exists(path):
+        print(f"Missing file path {path}")
+        return f"- Missing image at path {path} -"
+
+    if base64_encode:
+        src = base64_image(path, ext)
+    else:
+        src = '../' + path # make relative to output directory
+
+    attributes = ' '.join(img_attributes)
+    return f'<img {attributes} src="{src}" >'
+
+def replace_img(root, data_path, body, attachements, base64_encode):
+    replaced_body = re.sub('(<ac:image.+?>)(<ri:attachment (.+?)/>)(</ac:image>)', lambda m:attachement_replace(data_path, m, attachements, base64_encode), body)
+    return replaced_body
 
 def filter_most_recent(pages):
     """When one or more pages have the same title and creationDate, only
@@ -79,6 +159,63 @@ def filter_most_recent(pages):
 
     return filtered
 
+
+def parse_space_data(elem, root):
+
+    children = elem.getchildren()
+    data = {}
+
+    for child in children:
+        name = child.attrib.get('name', '')
+        # Check for some common child elements.
+        if child.tag == 'id':
+            data['id'] = child.text
+        # Property elements can be 'creatorName', 'creationDate',
+        # 'lastModificationDate', 'title' or something else we are
+        # not interested in.
+        if child.tag == 'property':
+            relevant = ['creator', 'creationDate', 'lastModifier', 'lastModificationDate', 'name', 'key', 'lowerKey', 'spaceStatus', 'homePage', 'description']
+            if name in relevant:
+                data[name] = child.text
+    return data
+
+def parse_attachement_data(elem, root):
+
+    children = elem.getchildren()
+    # Create no page if there is no contentStatus that is exactly "current".
+    # It seems like there are actually no top level page objects that do not
+    # have that trait, but we check for it anyway just to be sure.
+    #if not _include_current_pages(children):
+    #    return {}
+    data = {}
+
+    for child in children:
+        name = child.attrib.get('name', '')
+        # Check for some common child elements.
+        if child.tag == 'id':
+            data['id'] = child.text
+        # Property elements can be 'creatorName', 'creationDate',
+        # 'lastModificationDate', 'title' or something else we are
+        # not interested in.
+        if child.tag == 'property':
+            relevant = ['creator', 'creationDate', 'lastModifier', 'versionComment', 'lastModificationDate', 'title', 'lowerTitle', 'version', 'contentStatus', 'hibernateVersion']
+            if name in relevant:
+                data[name] = child.text
+            elif name == 'containerContent':
+                data['containerContent'] = child.find('id').text
+            elif name == 'space':
+                data['space'] = child.find('id').text
+        # Collection elements can be 'children', 'bodyContents',
+        # 'outgoingLinks', 'referralLinks' or something irrelevant for us.
+        if child.tag == 'collection':
+            relevant = ['contentProperties']
+            if name in relevant:
+                # All collections contain element tags with class "Page",
+                # "BodyContent", "ReferralLinks" a.s.o. Each of these
+                # contain an id tag with the id as text.
+                ids = _unpack_collection(child)
+                data[name] = ",".join(ids)
+    return data
 
 def parse_page_data(elem, root):
     """Given a page element, retrieve its page data.
@@ -117,6 +254,8 @@ def parse_page_data(elem, root):
             relevant = ['creatorName', 'creationDate', 'lastModificationDate', 'title', 'position', 'version', 'contentStatus']
             if name in relevant:
                 data[name] = child.text
+            elif name == 'space':
+                data['space'] = child.find('id').text
             elif name == 'parent':
                 data['parent'] = child.find('id').text
         # Collection elements can be 'children', 'bodyContents',
@@ -137,6 +276,13 @@ def parse_xml(path):
     tree = etree.parse(path)
     return tree.getroot()
 
+def retrieve_space_object(root):
+    spaces = {}
+    for element in root.findall('object[@class="Space"]'):
+        space = parse_space_data(element, root)
+        if space:
+            spaces[space['id']] = space
+    return spaces
 
 def retrieve_all_pages(root):
     """Build pages from xml tree."""
@@ -146,6 +292,23 @@ def retrieve_all_pages(root):
         if page:
             pages[page['id']] = page
     return pages
+
+def get_attachement_version(title, attachements):
+    version = 0
+    if title in attachements:
+        version = int(attachements[title]['version'])
+    return version
+
+def retrieve_latest_attachements(root):
+    """Build attachements from xml tree."""
+    attachements = {}
+    for element in root.findall('object[@class="Attachment"]'):
+        attachement = parse_attachement_data(element, root)
+        if attachement:
+            stored_version = get_attachement_version(attachement['title'], attachements)
+            if stored_version < int(attachement['version']):
+                attachements[attachement['title']] = attachement
+    return attachements
 
 
 def _get_body_content(root, obj_ids):

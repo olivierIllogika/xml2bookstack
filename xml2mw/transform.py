@@ -80,7 +80,7 @@ def _transform_emphasis(line):
             try:
                 markup = EMPHASIS[start]
                 replacement = '{}{}{}'.format(markup, content, markup)
-                line = re.sub(emphasis_pattern, replacement, line, count=1)
+                line = re.sub(emphasis_pattern, lambda x: replacement, line, count=1)
                 result = line
             except KeyError:
                 continue
