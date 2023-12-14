@@ -14,7 +14,7 @@ The forked repo [ben-tinc/xml2mw](https://github.com/ben-tinc/xml2mw) was a grea
 ## Usage
  
  * Clone this repo and `cd xml2bookstack`.
- * Use `pipenv install` to install all dependencies (or ensure for yourself that you use `python3` and that `lxml` and `anytree` are installed). If using `pipenv`, type `pipenv shell` afterwards to enter the virtualenv.
+ * Use `pipenv install` to install all dependencies (or ensure for yourself that you use `python3` and that `lxml` and `anytree` are installed). If using `pipenv`, type `pipenv shell` afterwards to enter the virtualenv. Prepend the command with `PIPENV_VENV_IN_PROJECT=1` if you want the virtual environment folder to be created locally. If your python version is greater than 3.6, edit Pipfile to have `python_version = "3"`.
  * Place the `entities.xml` file and `attachements` folder from the confluence export inside a `data` subdirectory (or specify location with -d/--data option).
  * Copy `dot.env.sample` to `.env` and configure for your BookStack instance (url, api token and secret)
  * Copy `emoticons` folder to your BookStack instance {web root}/public/emoticons (optional) 

@@ -9,7 +9,7 @@ to recreate the page contents.
 """
 
 from datetime import datetime
-
+from html import unescape as html_unescape
 from lxml import etree
 import re
 import os
@@ -100,7 +100,13 @@ def attachement_replace(data_path, match, attachements, base64_encode):
         pair = i.replace('"', '').split('=')
         attachement_attributes[pair[0]] = pair[1]
         
-    attachement = attachements[attachement_attributes['filename']]
+    filename = html_unescape(attachement_attributes['filename'])
+    if filename not in attachements:
+        error = f"- Missing attachement '{filename}' -"
+        print(error)
+        return error
+
+    attachement = attachements[filename]
 
     if 'version-at-save' in attachement_attributes:
         version = attachement_attributes['version-at-save']
@@ -112,8 +118,9 @@ def attachement_replace(data_path, match, attachements, base64_encode):
     ext = attachement_attributes['filename'].split('.')[-1].lower()
 
     if not os.path.exists(path):
-        print(f"Missing file path {path}")
-        return f"- Missing image at path {path} -"
+        error = f"- Missing image at path {path} -"
+        print(error)
+        return error
 
     if base64_encode:
         src = base64_image(path, ext)

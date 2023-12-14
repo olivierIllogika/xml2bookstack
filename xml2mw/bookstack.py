@@ -113,7 +113,7 @@ class Confluence2bookstack():
             print_body_size(body)
         elif 'error' in result:
             print(json.dumps(result))
-            if result.code == 413:
+            if result["error"]["code"] == 413:
                 print_body_size(body)
 
     def get_shelves(self):
